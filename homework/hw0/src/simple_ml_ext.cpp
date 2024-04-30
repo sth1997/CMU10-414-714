@@ -5,6 +5,18 @@
 
 namespace py = pybind11;
 
+void matmul(const float *X, const float *Y, float *Z, size_t m, size_t dim, size_t n)
+{
+    size_t idx = 0;
+    for (size_t i = 0; i < m; ++i)
+        for (size_t j =0; j < n; ++j)
+        {
+            Z[idx] = 0.0f;
+            for (size_t k = 0; k < dim; ++k)
+                Z[idx] += X[i * dim + k] * Y[k * n + j];
+            ++idx;
+        }
+}
 
 void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
 								  float *theta, size_t m, size_t n, size_t k,
@@ -33,6 +45,47 @@ void softmax_regression_epoch_cpp(const float *X, const unsigned char *y,
      */
 
     /// BEGIN YOUR CODE
+    size_t total_batch_num = (m + batch - 1) / batch;
+    float* Z = new float[batch * k];
+    float* X_T = new float[n * batch];
+    float* tmp_mat = new float[n * k];
+    for (size_t batch_num = 0; batch_num < total_batch_num; ++batch_num)
+    {
+        auto X_batch = X + batch_num * batch * n;
+        auto y_batch = y + batch_num * batch;
+        matmul(X_batch, theta, Z, batch, n, k);
+        // exp
+        for (size_t i = 0; i < batch * k; ++i)
+            Z[i] = exp(Z[i]);
+        //normalize
+        for (size_t i = 0; i < batch; ++i)
+        {
+            float *tmp_Z = Z + i * k;
+            float sum = 0.0f;
+            for (size_t j = 0; j < k; ++j)
+                sum += tmp_Z[j];
+            for (size_t j = 0; j < k; ++j)
+                tmp_Z[j] /= sum;
+        }
+        // Z - I_y
+        for (size_t i = 0; i < batch; ++i)
+            Z[i * k + y_batch[i]] -= 1.0;
+        //X_batch.T @ (Z-I_y)
+        size_t idx = 0;
+        for (size_t i = 0; i < n; ++i)
+            for (size_t j = 0; j < batch; ++j)
+            {
+                X_T[idx] =  X_batch[j * n + i];
+                ++idx;
+            }
+        matmul(X_T, Z, tmp_mat, n, batch, k);
+        for (size_t i = 0; i < n * k; ++i)
+            theta[i] -= lr / batch * tmp_mat[i];
+
+    }
+    delete[] Z;
+    delete[] X_T;
+    delete[] tmp_mat;
 
     /// END YOUR CODE
 }

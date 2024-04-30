@@ -20,7 +20,7 @@ def add(x, y):
         Sum of x + y
     """
     ### BEGIN YOUR CODE
-    pass
+    return x + y
     ### END YOUR CODE
 
 
@@ -48,7 +48,40 @@ def parse_mnist(image_filename, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR CODE
-    pass
+
+    # image
+    g = gzip.GzipFile(mode = "rb", fileobj=open(image_filename, 'rb'))
+    data = g.read()
+    fmt = ">iiii"
+    offset = 0
+    magic_number, image_num, height, width = struct.unpack_from(fmt, data, offset)
+    #print(magic_number, image_num, height, width) 
+    offset += struct.calcsize(fmt)
+    fmt = ">{}B".format(height * width)
+    images = np.empty((image_num, height * width)).astype(np.float32)
+    for img_num in range(image_num):
+    #for img_num in range(1):
+        pixel_list = struct.unpack_from(fmt, data, offset)
+        offset += struct.calcsize(fmt)
+        images[img_num] = np.array(pixel_list) / 255.0
+
+    
+    # label
+    g = gzip.GzipFile(mode = "rb", fileobj=open(label_filename, 'rb'))
+    data = g.read()
+    fmt = ">ii"
+    offset = 0
+    magic_number, label_num = struct.unpack_from(fmt, data, offset)
+    offset += struct.calcsize(fmt)
+    fmt = ">B"
+    labels = np.empty((label_num), dtype = np.uint8)
+    for lb_num in range(label_num):
+    #for lb_num in range(1):
+        labels[lb_num] = struct.unpack_from(fmt, data, offset)[0]
+        offset += struct.calcsize(fmt)
+
+    return((images, labels))
+
     ### END YOUR CODE
 
 
@@ -68,7 +101,7 @@ def softmax_loss(Z, y):
         Average softmax loss over the sample.
     """
     ### BEGIN YOUR CODE
-    pass
+    return ((np.sum(np.log(np.sum(np.exp(Z), axis=1))) - np.sum(Z[np.arange(y.size), y]))/y.size)
     ### END YOUR CODE
 
 
@@ -91,9 +124,18 @@ def softmax_regression_epoch(X, y, theta, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    for i in range((X.shape[0] + batch - 1) // batch):
+        X_batch = X[i * batch : (i + 1) * batch, :]
+        y_batch = y[i * batch : (i + 1) * batch]
+        Z = np.exp(X_batch @ theta)
+        Z = Z / np.sum(Z, axis = 1, keepdims = True)
+        I_y = np.zeros((batch, theta.shape[1]))
+        I_y[np.arange(batch), y_batch] = 1
+        theta -= lr / batch * (X_batch.T @ (Z - I_y))
     ### END YOUR CODE
 
+def relu(X):
+    return np.maximum(X, 0)
 
 def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
     """ Run a single epoch of SGD for a two-layer neural network defined by the
@@ -118,7 +160,18 @@ def nn_epoch(X, y, W1, W2, lr = 0.1, batch=100):
         None
     """
     ### BEGIN YOUR CODE
-    pass
+    for i in range((X.shape[0] + batch - 1) // batch):
+        X_batch = X[i * batch : (i + 1) * batch, :]
+        y_batch = y[i * batch : (i + 1) * batch]
+        Z1 = relu(X_batch @ W1)
+        Z2 = np.exp(Z1 @ W2)
+        Z2 = Z2 / np.sum(Z2, axis = 1, keepdims = True)
+        I_y = np.zeros((batch, W2.shape[1]))
+        I_y[np.arange(batch), y_batch] = 1
+        G2 = Z2 - I_y
+        G1 = (Z1 > 0) * (G2 @ W2.T)
+        W2 -= lr / batch * (Z1.T @ G2)
+        W1 -= lr / batch * (X_batch.T @ G1)
     ### END YOUR CODE
 
 
