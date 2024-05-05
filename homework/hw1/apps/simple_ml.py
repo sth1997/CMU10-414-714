@@ -10,7 +10,7 @@ sys.path.append("python/")
 import needle as ndl
 
 
-def parse_mnist(image_filesname, label_filename):
+def parse_mnist(image_filename, label_filename):
     """Read an images and labels file in MNIST format.  See this page:
     http://yann.lecun.com/exdb/mnist/ for a description of the file format.
 
@@ -33,7 +33,39 @@ def parse_mnist(image_filesname, label_filename):
                 for MNIST will contain the values 0-9.
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+
+    # image
+    g = gzip.GzipFile(mode = "rb", fileobj=open(image_filename, 'rb'))
+    data = g.read()
+    fmt = ">iiii"
+    offset = 0
+    magic_number, image_num, height, width = struct.unpack_from(fmt, data, offset)
+    #print(magic_number, image_num, height, width) 
+    offset += struct.calcsize(fmt)
+    fmt = ">{}B".format(height * width)
+    images = np.empty((image_num, height * width)).astype(np.float32)
+    for img_num in range(image_num):
+    #for img_num in range(1):
+        pixel_list = struct.unpack_from(fmt, data, offset)
+        offset += struct.calcsize(fmt)
+        images[img_num] = np.array(pixel_list) / 255.0
+
+    
+    # label
+    g = gzip.GzipFile(mode = "rb", fileobj=open(label_filename, 'rb'))
+    data = g.read()
+    fmt = ">ii"
+    offset = 0
+    magic_number, label_num = struct.unpack_from(fmt, data, offset)
+    offset += struct.calcsize(fmt)
+    fmt = ">B"
+    labels = np.empty((label_num), dtype = np.uint8)
+    for lb_num in range(label_num):
+    #for lb_num in range(1):
+        labels[lb_num] = struct.unpack_from(fmt, data, offset)[0]
+        offset += struct.calcsize(fmt)
+
+    return((images, labels))
     ### END YOUR SOLUTION
 
 
@@ -54,7 +86,8 @@ def softmax_loss(Z, y_one_hot):
         Average softmax loss over the sample. (ndl.Tensor[np.float32])
     """
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    #return ((np.sum(np.log(np.sum(np.exp(Z), axis=1))) - np.sum(Z[np.arange(y.size), y]))/y.size)
+    return ((ndl.log(ndl.exp(Z).sum(axes=(1,))).sum() - (y_one_hot * Z).sum()) / Z.shape[0])
     ### END YOUR SOLUTION
 
 
@@ -83,7 +116,17 @@ def nn_epoch(X, y, W1, W2, lr=0.1, batch=100):
     """
 
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    for i in range((X.shape[0] + batch - 1) // batch):
+        X_batch = ndl.Tensor(X[i * batch : (i + 1) * batch, :])
+        y_one_hot = np.zeros((batch, W2.shape[1]))
+        y_one_hot[np.arange(batch), y[i * batch : (i + 1) * batch]] = 1
+        y_batch = ndl.Tensor(y_one_hot)
+        Z = ndl.relu(X_batch.matmul(W1)).matmul(W2)
+        loss = softmax_loss(Z, y_batch)
+        loss.backward()
+        W1 = ndl.Tensor(W1.realize_cached_data() - lr * W1.grad.realize_cached_data())
+        W2 = ndl.Tensor(W2.realize_cached_data() - lr * W2.grad.realize_cached_data())
+    return W1, W2
     ### END YOUR SOLUTION
 
 
